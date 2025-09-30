@@ -70,9 +70,53 @@ export async function createPerk(req, res, next) {
 // TODO
 // Update an existing perk by ID and validate only the fields that are being updated 
 export async function updatePerk(req, res, next) {
-  
-}
+  try {
+    // Create a schema that only validates the provided fields
+    const updateSchema = Joi.object({
+      title: perkSchema.extract('title').optional(),
+      description: perkSchema.extract('description').optional(),
+      category: perkSchema.extract('category').optional(),
+      discountPercent: perkSchema.extract('discountPercent').optional(),
+      merchant: perkSchema.extract('merchant').optional()
+    });
 
+    // Validate only the fields that are provided
+    const { value, error } = updateSchema.validate(req.body, { 
+      stripUnknown: true,
+      allowUnknown: false
+    });
+    
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    // Only proceed if there are fields to update
+    if (Object.keys(value).length === 0) {
+      return res.status(400).json({ message: 'No valid fields to update' });
+    }
+
+    const updatedPerk = await Perk.findByIdAndUpdate(
+      req.params.id,
+      { $set: value },
+      { 
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedPerk) {
+      return res.status(404).json({ message: 'Perk not found' });
+    }
+
+    res.json({ perk: updatedPerk });
+
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'Duplicate perk for this merchant' });
+    }
+    next(err);
+  }
+}
 
 // Delete a perk by ID
 export async function deletePerk(req, res, next) {
